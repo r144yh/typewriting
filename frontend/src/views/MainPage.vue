@@ -2,14 +2,28 @@
   <div class="main-page__container">
     <section class="score__container">
       <div>
-        <b-icon icon="lightning" font-scale="1.2" variant="Light" animation="throb" shift-v=".5"></b-icon>
-        <span>Скорость: </span>
-        <span>{{ speed }} зн./мин</span>
+        <div>
+          <b-icon icon="lightning" font-scale="1.2" variant="Light" animation="throb" shift-v=".5"></b-icon>
+          <span>Скорость: </span>
+          <span>{{ speed }} зн./мин</span>
+        </div>
+        <div>
+          <b-icon icon="check2-all" font-scale="1.2" variant="Light"></b-icon>
+          <span> Точность: </span>
+          <span>{{ accuracy }}%</span>
+        </div>
       </div>
       <div>
-        <b-icon icon="check2-all" font-scale="1.2" variant="Light"></b-icon>
-        <span> Точность: </span>
-        <span>{{ accuracy }}%</span>
+        <div>
+          <b-icon icon="bug" font-scale="1.2" variant="Light"></b-icon>
+          <span> Количество ошибок: </span>
+          <span>{{ errorsCounter }}</span>
+        </div>
+        <div>
+          <b-icon icon="emoji-sunglasses" font-scale="1.2" variant="Light"></b-icon>
+          <span> Лучший результат: </span>
+          <span>{{ bestSpeed }} зн./мин</span>
+        </div>
       </div>
     </section>
     <section class="text__container">
@@ -37,6 +51,7 @@
             </div>
           </div>
         </section>-->
+    <p>{{formattedElapsedTime}}</p>
   </div>
 </template>
 
@@ -48,9 +63,7 @@ export default {
   data() {
     return {
       text: [],               /* Исходный текст */
-      speed: 0,               /* Скорость печати */
-      accuracy: 100,          /* Точность печати */
-      reset: false,           /* Смена исходного текста */
+      currentIndex: 0,        /* Индекс символа из текста */
       keyboard: {
         /*        keysRu: [
                   '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'backspace',
@@ -77,17 +90,35 @@ export default {
           'done', 'z', 'x', 'c', 'v', 'b', 'n', 'm', '<', '>', '?',
           'volume', 'space', 'language', 'shift'],
       },
-      errors: [],             /* Отлов ошибок с сервера */
-      currentKey: null,       /* Текущий символ с клавиатуры пользователя */
+
+      speed: 0,               /* Скорость печати */
+      accuracy: 100,          /* Точность печати */
+      errorsCounter: 0,       /* Счетчик ошибок */
+      bestSpeed: 0,           /* Лучший результат пользователя */
+
+      start: false,           /* Начало тренажера */
+      reset: false,           /* Смена исходного текста */
+      timer: null,            /* Отсчёт времени */
+      elapsedTime: 0,         /* Прошедшее время */
+
       correctAnswer: false,   /* Смена класса для правильного ответа */
       wrongAnswer: false,     /* Смена класса для неправильного ответа */
-      nextKey: true,         /* Смена класса для следующего вводимого символа */
-      start: false,           /* Начало тренажера */
-      currentIndex: 0,        /* Индекс символа из текста */
+      nextKey: true,          /* Смена класса для следующего вводимого символа */
+
+      errors: [],             /* Отлов ошибок с сервера */
     };
+  },
+  computed: {
+    formattedElapsedTime() {
+      const date = new Date(null);
+      date.setSeconds(this.elapsedTime / 1000);
+      const utc = date.toUTCString();
+      return utc.substr(utc.indexOf(":") - 2, 8);
+    }
   },
   methods: {
     async getText() {
+      /*      this.text = ['a', 'b', 'c'];*/
       try {
         let response = await HTTPS.get(`/?type=all-meat&paras=1&format=text/`);
         this.text = response.data.join();
@@ -103,45 +134,75 @@ export default {
       if (test === null) return;
 
       if (this.start === false) {
-        this.setResult();
+        this.timer = setInterval(() => {
+          this.elapsedTime += 1000;
+        }, 1000);
+        this.changeTimer(1);
         this.start = true;
       }
 
-      if (this.currentIndex < this.text.length) {
+      if (this.currentIndex < this.text.length && elem.key !== 'CapsLock') {
         if (elem.key === this.text[this.currentIndex]) {
           this.correctAnswer = true;
           this.currentIndex++;
+          this.nextKey = true;
+          this.calculateAccuracy();
+
+          if ((this.currentIndex + 1) === this.text.length) {
+            this.changeTimer(0);
+            if (this.speed > this.bestSpeed) {
+              this.bestSpeed = this.speed;
+              localStorage.setItem('bestSpeed', this.bestSpeed);
+            }
+            clearInterval(this.timer);
+          }
         } else {
           this.nextKey = false;
           this.wrongAnswer = true;
+          this.errorsCounter++;
+          this.calculateAccuracy();
         }
-        /* else {
-          while (elem.key !== this.text[this.currentIndex]){
-            this.nextKey = false;
-            this.wrongAnswer = true;
-          }
-          this.wrongAnswer = false;
-          this.nextKey = true;
-          this.correctAnswer = true;
-          this.currentIndex++;
-        }*/
       }
 
       console.log(elem.key);
     },
-    setResult() {
-
+    changeTimer(num) {
+      if (num === 1) {
+        console.log(num);
+      }
+    },
+    calculateAccuracy() {
+      if (this.errorsCounter !== 0) {
+        this.accuracy = Math.abs(((this.errorsCounter - this.text.length) / this.text.length) * 100).toFixed(1);
+      }
     },
     resetResult() {
-      // TODO: обнулить скорость и точность
       this.getText();
-      this.start = false;
       this.currentIndex = 0;
+
+      this.speed = 0;
+      this.accuracy = 100;
+      this.errorsCounter = 0;
+
+      this.start = false;
+
+      this.correctAnswer = false;
+      this.wrongAnswer = false;
+      this.nextKey = true;
+
+      this.elapsedTime = 0;
+
+      clearInterval(this.timer);
     },
   },
   created() {
     document.addEventListener('keydown', this.checkSymbol);
     this.getText();
+    this.bestSpeed = localStorage.getItem('bestSpeed');
+    if (this.bestSpeed === null) {
+      this.bestSpeed = 0;
+      localStorage.setItem('bestSpeed', this.bestSpeed);
+    }
   },
 };
 </script>
@@ -155,24 +216,22 @@ export default {
 }
 
 .score__container, .text__container {
-  display: block;
-  width: 90%;
+  width: 80%;
 
   margin: 1rem auto;
-  padding: .625rem;
+  padding: 2rem;
   font-size: 20px;
   border-radius: 1rem;
 }
 
 .score__container {
-  min-height: 5.75rem;
-  height: calc(100vh - 62rem);
   background-image: linear-gradient(120deg, #ebedee 0%, #fdfbfb 100%) !important;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
 }
 
 .text__container {
-  min-height: 15.75rem;
-  height: calc(100vh - 42.75rem);
   background-image: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%) !important;
   opacity: .9;
 }
@@ -182,10 +241,13 @@ export default {
   left: 0;
   bottom: 0;
   width: 100%;
+  user-select: none;
+
   padding: 5px 0;
+
   background: #233162;
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
-  user-select: none;
+
   transition: bottom 0.4s;
 }
 
@@ -194,24 +256,31 @@ export default {
 }
 
 .keyboard__key {
-  height: 45px;
-  width: 6%;
-  max-width: 90px;
-  margin: 3px;
-  border-radius: 4px;
-  border: none;
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  font-size: 1.05rem;
-  outline: none;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  vertical-align: top;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
+
   position: relative;
+  height: 45px;
+  width: 6%;
+  max-width: 90px;
+
+  margin: 3px;
+  padding: 0;
+
+  border-radius: 4px;
+  border: none;
+
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+
+  font-size: 1.05rem;
+  outline: none;
+  cursor: pointer;
+
+  vertical-align: top;
+  -webkit-tap-highlight-color: transparent;
+
 }
 
 .keyboard__key:hover {
@@ -230,8 +299,9 @@ export default {
 
 .wrongSymbol {
   background: #f16d6d;
-  -webkit-animation: blink 2s ease-in infinite both;
-  animation: blink 2s ease-in infinite both;
+  color: #2c3e50;
+  -webkit-animation: blink2 2s ease-in infinite both;
+  animation: blink2 2s ease-in infinite both;
 }
 
 .nextSymbol {
@@ -267,6 +337,36 @@ export default {
   }
   100% {
     background: #d5d1ef;
+    color: #2c3e50;
+  }
+}
+
+@-webkit-keyframes blink2 {
+  0% {
+    background: #f16d6d;
+    color: #2c3e50;
+  }
+  50% {
+    background: #d40101;
+    color: #e7eaec;
+  }
+  100% {
+    background: #f16d6d;
+    color: #2c3e50;
+  }
+}
+
+@keyframes blink2 {
+  0% {
+    background: #f16d6d;
+    color: #2c3e50;
+  }
+  50% {
+    background: #d40101;
+    color: #e7eaec;
+  }
+  100% {
+    background: #f16d6d;
     color: #2c3e50;
   }
 }
