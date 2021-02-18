@@ -2,22 +2,8 @@
   <div class="header__container">
     <b-navbar toggleable="lg" type="dark">
       <b-navbar-nav class="ml-auto">
-        <b-nav-item>
-          <button
-              class="btn-sound"
-              v-b-popover.hover.top="'Отключить звуки нажатия клавиш'"
-              v-if="sound"
-              @click="sound = false">
-            <b-icon icon="volume-up" font-scale="1.5" variant="Light"></b-icon>
-          </button>
-          <button
-              class="btn-sound"
-              v-b-popover.hover.top="'Включить звуки нажатия клавиш'"
-              v-else
-              @click="sound = true">
-            <b-icon icon="volume-mute" font-scale="1.5" variant="Light"></b-icon>
-          </button>
-        </b-nav-item>
+        <b-nav-item href="https://github.com/r144yh"
+                    v-b-popover.hover.bottom="'https://github.com/r144yh'">r144yh</b-nav-item>
       </b-navbar-nav>
 
       <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
@@ -47,7 +33,7 @@ a {
 }
 
 a:hover {
-  color: #282626 !important;
+  color: #477347 !important;
 }
 
 .btn-sound {

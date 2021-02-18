@@ -39,19 +39,21 @@
         </button>
       </div>
     </section>
-    <!--    <section class="keyboard__container">
-          <div class="keyboard">
-            <div class="keyboard__keys">
-              <button
-                  v-for="keyValue in keyboard.keysEn"
-                  :key="keyValue"
-                  class="keyboard__key">
-                {{ keyValue }}
-              </button>
-            </div>
-          </div>
-        </section>-->
-    <p>{{formattedElapsedTime}}</p>
+    <div>
+      <b-modal id="modalLang" content-class="shadow" hide-header hide-footer centered>
+        <p class="my-4">Необходимо сменить раскладку языка</p>
+        <b-button class="mt-3" variant="outline-success" block @click="$bvModal.hide('modalLang')">Okay</b-button>
+      </b-modal>
+    </div>
+    <div>
+      <b-modal id="modalResult" content-class="shadow" hide-header hide-footer centered>
+        <p class="my-4">Поздравляем!</p>
+        <p class="my-4">Ваша скорость: {{ speed }}</p>
+        <p class="my-4">Ваша точность: {{ accuracy }}</p>
+        <b-button class="mt-3" variant="outline-success" block @click="resetResult">Thanks</b-button>
+      </b-modal>
+    </div>
+    <p>{{ formattedElapsedTime }}</p>
   </div>
 </template>
 
@@ -64,32 +66,6 @@ export default {
     return {
       text: [],               /* Исходный текст */
       currentIndex: 0,        /* Индекс символа из текста */
-      keyboard: {
-        /*        keysRu: [
-                  '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'backspace',
-                  'й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х', 'ъ', '/',
-                  'caps', 'ф', 'ы', 'в', 'а', 'п', 'р', 'о', 'л', 'д', 'ж', 'enter',
-                  'done', 'я', 'ч', 'с', 'м', 'и', 'т', 'ь', 'б', 'ю', 'э', '?',
-                  'volume', 'space', ',', '.', 'language', 'shift'],*/
-        keysEn: [
-          '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'backspace',
-          '*', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '/',
-          'caps', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'enter',
-          'done', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.', '?',
-          'volume', 'space', 'language', 'shift'],
-        /*        shiftKeysRu: [
-                  '!', '\'', '№', ';', '%', ':', '_', '*', '(', ')', 'backspace',
-                  'й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х', 'ъ', '/',
-                  'caps', 'ф', 'ы', 'в', 'а', 'п', 'р', 'о', 'л', 'д', 'ж', 'enter',
-                  'done', 'я', 'ч', 'с', 'м', 'и', 'т', 'ь', 'б', 'ю', 'э', '?',
-                  'volume', 'space', '-', '=', 'language', 'shift'],*/
-        shiftKeysEn: [
-          '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', 'backspace',
-          '+', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '/',
-          'caps', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'enter',
-          'done', 'z', 'x', 'c', 'v', 'b', 'n', 'm', '<', '>', '?',
-          'volume', 'space', 'language', 'shift'],
-      },
 
       speed: 0,               /* Скорость печати */
       accuracy: 100,          /* Точность печати */
@@ -99,7 +75,10 @@ export default {
       start: false,           /* Начало тренажера */
       reset: false,           /* Смена исходного текста */
       timer: null,            /* Отсчёт времени */
+      speedTimer: null,       /* Отсчёт скорости */
       elapsedTime: 0,         /* Прошедшее время */
+      lastSpeed: 0,           /* Последняя скорость до минут */
+      lastIndex: 0,           /* Последний индекс до минут */
 
       correctAnswer: false,   /* Смена класса для правильного ответа */
       wrongAnswer: false,     /* Смена класса для неправильного ответа */
@@ -113,32 +92,43 @@ export default {
       const date = new Date(null);
       date.setSeconds(this.elapsedTime / 1000);
       const utc = date.toUTCString();
-      return utc.substr(utc.indexOf(":") - 2, 8);
-    }
+      return utc.substr(utc.indexOf(':') - 2, 8);
+    },
   },
   methods: {
     async getText() {
-      /*      this.text = ['a', 'b', 'c'];*/
       try {
         let response = await HTTPS.get(`/?type=all-meat&paras=1&format=text/`);
         this.text = response.data.join();
         this.text = this.text.split('');
+
+        for (let i = 0; i < this.text.length; i++) {
+          if (this.text[i] === ' ' && this.text[i - 1] === ' ') {
+            this.text.splice(i, 1);
+          }
+        }
       } catch (error) {
         this.errors.push(error);
       }
     },
+
     checkSymbol(elem) {
-      let test = elem.key.match(
+      let reg = elem.key.match(
           /^((?!Enter|Escape|Tab|Delete|Backspace|Insert|PageUp|PageDown|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|End|Home|Shift|F1|F2|F3|F4|F5|F6|F7|F8|F9|F10|F11|F12).)*$/i);
-      console.log(test);
-      if (test === null) return;
+      if (reg === null) return;
+
+      let lang = elem.key.match(/[а-яё]/ig);
+      if (lang !== null) {
+        this.$bvModal.show('modalLang');
+        return;
+      }
 
       if (this.start === false) {
         this.timer = setInterval(() => {
           this.elapsedTime += 1000;
         }, 1000);
-        this.changeTimer(1);
         this.start = true;
+        this.calculateSpeed();
       }
 
       if (this.currentIndex < this.text.length && elem.key !== 'CapsLock') {
@@ -148,13 +138,14 @@ export default {
           this.nextKey = true;
           this.calculateAccuracy();
 
-          if ((this.currentIndex + 1) === this.text.length) {
-            this.changeTimer(0);
-            if (this.speed > this.bestSpeed) {
+          if ((this.currentIndex) === this.text.length) {
+            if (Number(this.speed) > Number(this.bestSpeed)) {
               this.bestSpeed = this.speed;
               localStorage.setItem('bestSpeed', this.bestSpeed);
             }
             clearInterval(this.timer);
+            clearInterval(this.speedTimer);
+            this.$bvModal.show('modalResult');
           }
         } else {
           this.nextKey = false;
@@ -163,19 +154,30 @@ export default {
           this.calculateAccuracy();
         }
       }
+    },
 
-      console.log(elem.key);
+    calculateSpeed() {
+      this.speedTimer = setInterval(() => {
+        if (this.elapsedTime % 60000 === 0) {
+          this.lastSpeed = Number(this.speed);
+          this.lastIndex = this.currentIndex;
+          return;
+        }
+        if (Math.trunc(this.elapsedTime / 60000) > 0) {
+          this.speed = (((((this.currentIndex - this.lastIndex) / (this.elapsedTime % 60000)) * 60000) + this.lastSpeed) / (Math.trunc(this.elapsedTime / 60000) + 1)).toFixed(0);
+        }
+        else {
+          this.speed = ((this.currentIndex / (this.elapsedTime % 60000)) * 60000).toFixed(0);
+        }
+      }, 1000);
     },
-    changeTimer(num) {
-      if (num === 1) {
-        console.log(num);
-      }
-    },
+
     calculateAccuracy() {
       if (this.errorsCounter !== 0) {
         this.accuracy = Math.abs(((this.errorsCounter - this.text.length) / this.text.length) * 100).toFixed(1);
       }
     },
+
     resetResult() {
       this.getText();
       this.currentIndex = 0;
@@ -193,7 +195,11 @@ export default {
       this.elapsedTime = 0;
 
       clearInterval(this.timer);
+      clearInterval(this.speedTimer);
+
+      this.$bvModal.hide('modalResult');
     },
+
   },
   created() {
     document.addEventListener('keydown', this.checkSymbol);
@@ -234,63 +240,6 @@ export default {
 .text__container {
   background-image: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%) !important;
   opacity: .9;
-}
-
-.keyboard {
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  user-select: none;
-
-  padding: 5px 0;
-
-  background: #233162;
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
-
-  transition: bottom 0.4s;
-}
-
-.keyboard__keys {
-  text-align: center;
-}
-
-.keyboard__key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  position: relative;
-  height: 45px;
-  width: 6%;
-  max-width: 90px;
-
-  margin: 3px;
-  padding: 0;
-
-  border-radius: 4px;
-  border: none;
-
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-
-  font-size: 1.05rem;
-  outline: none;
-  cursor: pointer;
-
-  vertical-align: top;
-  -webkit-tap-highlight-color: transparent;
-
-}
-
-.keyboard__key:hover {
-  background: rgba(255, 255, 255, 0.35);
-  cursor: pointer;
-}
-
-.keyboard__key:active {
-  background: rgba(255, 255, 255, 0.12);
-  cursor: pointer;
 }
 
 .correctSymbol {
